@@ -15,11 +15,19 @@ def get_historical_data(symbol, timeframe, days):
     # Get historical data using the Binance client
     klines = client.futures_historical_klines(symbol, timeframe, start_date.strftime("%Y-%m-%d %H:%M:%S"), end_date.strftime("%Y-%m-%d %H:%M:%S"))
 
-    return klines
+    df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
+    df['high'] = df['high'].astype(float)
+    df['low'] = df['low'].astype(float)
+
+    # Calculate max and min historical prices
+    max_price = df['high'].max()
+    min_price = df['low'].min()
+
+    return klines, max_price, min_price
 
 def analyze_bollinger_bands(symbol, timeframe, days):
     # Get historical data
-    klines = get_historical_data(symbol, timeframe, days)
+    klines, all_time_high, all_time_low = get_historical_data(symbol, timeframe, days)
 
     # Convert to pandas DataFrame
     df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
@@ -47,6 +55,8 @@ def analyze_bollinger_bands(symbol, timeframe, days):
     max_distance_below_lower = 0
     signals_above_0_5_percent = 0
     signals_under_0_5_percent = 0
+    signals_above_1_percent = 0
+    signals_under_1_percent = 0
 
     # Print the breakout time and distance to the maximum for each candle
     print("Breakout Time   |   Distance to Band (%)   |   Breaking Candle Max Price   |   Next Candle Min Price   |   Next Candle Max Price   |   Distance to Min (%)   |   Distance to Max (%)")
@@ -75,6 +85,11 @@ def analyze_bollinger_bands(symbol, timeframe, days):
                 else:
                     signals_under_0_5_percent += 1
 
+                if abs(distance_to_min_percentage) >= 1:
+                    signals_above_1_percent += 1
+                else:
+                    signals_under_1_percent += 1
+
             elif df.iloc[i]['price_below_lower']:
                 distance_to_band = ((breaking_candle_min_price - lower_band.iloc[i]) / lower_band.iloc[i]) * 100
                 distance_to_max_percentage = ((breaking_candle_min_price - next_candle_min_price) / next_candle_min_price) * -100
@@ -87,6 +102,11 @@ def analyze_bollinger_bands(symbol, timeframe, days):
                     signals_above_0_5_percent += 1
                 else:
                     signals_under_0_5_percent += 1
+
+                if abs(distance_to_min_percentage) >= 1:
+                    signals_above_1_percent += 1
+                else:
+                    signals_under_1_percent += 1
             
 
             # Update max distances
@@ -111,6 +131,10 @@ def analyze_bollinger_bands(symbol, timeframe, days):
     print(f"Highest percentage distance from lower band: {max_distance_below_lower:.2f}%")
     print("Signals with take profit above 0.5%:", signals_above_0_5_percent)
     print("Signals with take profit under 0.5%:", signals_under_0_5_percent)
+    print("Signals with take profit above 1%:", signals_above_1_percent)
+    print("Signals with take profit under 1%:", signals_under_1_percent)
+    print(f"Temporary Max price: {all_time_high}")
+    print(f"Temporary Min price: {all_time_low}")
 
 
 
